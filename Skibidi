@@ -1,0 +1,69 @@
+local fov = 100
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Players = game:GetService("Players")
+local Cam = workspace.CurrentCamera
+
+-- Tạo vòng FOV
+local FOVring = Drawing.new("Circle")
+FOVring.Visible = true
+FOVring.Thickness = 2
+FOVring.Color = Color3.fromRGB(128, 0, 128) -- Màu tím
+FOVring.Filled = false
+FOVring.Radius = fov
+FOVring.Position = Cam.ViewportSize / 2
+
+-- Cập nhật vị trí vòng FOV
+local function updateDrawings()
+    FOVring.Position = Cam.ViewportSize / 2
+end
+
+-- Nhìn về phía mục tiêu
+local function lookAt(target)
+    local lookVector = (target - Cam.CFrame.Position).Unit
+    Cam.CFrame = CFrame.new(Cam.CFrame.Position, Cam.CFrame.Position + lookVector)
+end
+
+-- Tìm người chơi gần nhất trong FOV
+local function getClosestPlayerInFOV(trg_part)
+    local nearest = nil
+    local last = math.huge
+    local playerMousePos = Cam.ViewportSize / 2 -- Tâm màn hình
+
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= Players.LocalPlayer then -- Bỏ qua người chơi local
+            local character = player.Character
+            local part = character and character:FindFirstChild(trg_part)
+            if part then
+                local ePos, isVisible = Cam:WorldToViewportPoint(part.Position)
+                if isVisible then
+                    local distance = (Vector2.new(ePos.X, ePos.Y) - playerMousePos).Magnitude
+                    if distance < last and distance < fov then
+                        last = distance
+                        nearest = player
+                    end
+                end
+            end
+        end
+    end
+
+    return nearest
+end
+
+-- Lắng nghe sự kiện RenderStepped
+RunService.RenderStepped:Connect(function()
+    updateDrawings()
+
+    local closest = getClosestPlayerInFOV("Head")
+    if closest and closest.Character and closest.Character:FindFirstChild("Head") then
+        lookAt(closest.Character.Head.Position)
+    end
+end)
+
+-- Gỡ vòng FOV khi nhấn phím Delete
+UserInputService.InputBegan:Connect(function(input)
+    if input.KeyCode == Enum.KeyCode.Delete then
+        RunService:UnbindFromRenderStep("FOVUpdate")
+        FOVring:Remove()
+    end
+end)
